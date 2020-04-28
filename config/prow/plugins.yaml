@@ -1,0 +1,46 @@
+#blockades:
+#- repos:
+#  - redhat-cop/containers-quickstarts
+#  blockregexps:
+#  - ^_test/
+#  explanation: "Changes to files in _test require owner approval before testing"
+
+plugins:
+  redhat-cop/test-infra:
+  - config-updater
+  redhat-cop/containers-quickstarts:
+  - approve
+  - assign
+  - help
+  - lgtm
+  - size
+  - trigger
+  - verify-owners
+  - wip
+  redhat-cop/org:
+  - approve
+  - assign
+  - help
+  - lgtm
+  - size
+  - trigger
+  - verify-owners
+  - wip
+  redhat-cop/pipeline-library:
+  - approve
+  - assign
+  - help
+  - lgtm
+  - size
+  - trigger
+  - verify-owners
+  - wip
+
+config_updater:
+  maps:
+    # Update the config configmap whenever config.yaml changes
+    config/prow/config.yaml:
+      name: config
+    # Update the plugin configmap whenever plugins.yaml changes
+    config/prow/plugins.yaml:
+      name: plugin

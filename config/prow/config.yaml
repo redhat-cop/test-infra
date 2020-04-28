@@ -1,0 +1,320 @@
+prowjob_namespace: default
+pod_namespace: test-pods
+
+deck:
+  spyglass:
+    size_limit: 500000000
+    lenses:
+      - lens:
+          name: buildlog
+          config:
+            highlight_regexes:
+              - timed_out
+              - 'ERROR:'
+              - (\s|^)(FAIL|Failure \[)\b
+              - (\s|^)panic\b
+              - ^E\d{4} \d\d:\d\d:\d\d.\d\d\d]
+        required_files:
+          - build-log.txt
+
+plank:
+  allow_cancellation: true
+  job_url_prefix: 'https://prow-default.apps.ci-1.cop.rht-labs.com/view/gcs'
+  default_decoration_config:
+    utility_images:
+      clonerefs: gcr.io/k8s-prow/clonerefs:v20190823-9f991db2d
+      initupload: gcr.io/k8s-prow/initupload:v20190823-9f991db2d
+      entrypoint: gcr.io/k8s-prow/entrypoint:v20190823-9f991db2d
+      sidecar: gcr.io/k8s-prow/sidecar:v20190823-9f991db2d
+    gcs_configuration:
+      bucket: prow-artifacts-cop
+      path_strategy: explicit
+    gcs_credentials_secret: gcs-credentials
+
+periodics:
+  - name: pl-daily-master
+    interval: 24h
+    decorate: true
+    always_run: true
+    skip_report: true
+    extra_refs:
+      - org: redhat-cop
+        repo: pipeline-library
+        base_ref: master
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+          command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+          args: ["oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/setup.sh applier plci-${PROW_JOB_ID} && _test/setup.sh test plci-${PROW_JOB_ID} && oc delete project plci-${PROW_JOB_ID}{,-promotion-testing,-build-s2i-executable,-sonarqube}"]
+          env:
+            - name: GIT_COMMITTER_NAME
+              value: RedHat Containers CoP
+            - name: GIT_COMMITTER_EMAIL
+              value: redhat-cop@redhat.com
+  - name: cq-daily-master
+    interval: 24h
+    decorate: true
+    always_run: true
+    skip_report: true
+    extra_refs:
+      - org: redhat-cop
+        repo: containers-quickstarts
+        base_ref: master
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+          command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+          args: ["oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/setup.sh applier cqci-${PROW_JOB_ID} && _test/setup.sh test cqci-${PROW_JOB_ID} && oc delete project cqci-${PROW_JOB_ID}"]
+          env:
+            - name: GIT_COMMITTER_NAME
+              value: RedHat Containers CoP
+            - name: GIT_COMMITTER_EMAIL
+              value: redhat-cop@redhat.com
+  - name: cq-rabbitmq-daily-master
+    interval: 24h
+    decorate: true
+    always_run: true
+    skip_report: true
+    extra_refs:
+      - org: redhat-cop
+        repo: containers-quickstarts
+        base_ref: master
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+          command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+          args: ["mkdir -p $HOME/bin && curl -Lo $HOME/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x $HOME/bin/jq && export PATH=$PATH:$HOME/bin && oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/rabbitmq.sh applier cqci-rabbitmq-${PROW_JOB_ID} && _test/rabbitmq.sh test cqci-rabbitmq-${PROW_JOB_ID} && oc delete project cqci-rabbitmq-${PROW_JOB_ID}"]
+          env:
+            - name: GIT_COMMITTER_NAME
+              value: RedHat Containers CoP
+            - name: GIT_COMMITTER_EMAIL
+              value: redhat-cop@redhat.com
+  - name: openshift-templates-daily-master
+    interval: 24h
+    decorate: true
+    always_run: true
+    skip_report: true
+    extra_refs:
+      - org: pabrahamsson
+        repo: openshift-templates
+        base_ref: ci_test
+    spec:
+      containers:
+        - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+          command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+          args: ["_test/run.sh"]
+          env:
+            - name: GIT_COMMITTER_NAME
+              value: RedHat Containers CoP
+            - name: GIT_COMMITTER_EMAIL
+              value: redhat-cop@redhat.com
+  - name: org-update-configs-sync
+    decorate: true
+    interval: 24h
+    run_if_changed: config.yaml
+    extra_refs:
+      - org: redhat-cop
+        repo: org
+        base_ref: master
+    spec:
+      containers:
+      - args:
+        - --config-path=./config.yaml
+        - --confirm=true
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy.default.svc	
+        - --github-endpoint=https://api.github.com	
+        - --github-graphql-endpoint=http://ghproxy.default.svc/graphql
+        - --fix-org
+        - --fix-org-members
+        - --fix-teams
+        - --fix-team-members
+        - --fix-team-repos
+        command:
+        - /app/prow/cmd/peribolos/app.binary
+        image: gcr.io/k8s-prow/peribolos:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      volumes:
+      - name: token
+        secret:
+          secretName: github-oauth-token
+  - name: pl-test-daily-master
+    interval: 24h
+    decorate: true
+    always_run: true
+    skip_report: true
+    extra_refs:
+      - org: pabrahamsson
+        repo: pipeline-library
+        base_ref: prow_support
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+          command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+          args: ["oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/setup.sh applier -n plci-${PROW_JOB_ID} && _test/setup.sh test -n plci-${PROW_JOB_ID} && oc delete project plci-${PROW_JOB_ID}{,-promotion-testing,-build-s2i-executable,-sonarqube}"]
+          env:
+            - name: GIT_COMMITTER_NAME
+              value: RedHat Containers CoP
+            - name: GIT_COMMITTER_EMAIL
+              value: redhat-cop@redhat.com
+
+presubmits:
+  redhat-cop/containers-quickstarts:
+    - name: cq-jenkins-slaves-pr-build
+      decorate: true
+      #always_run: true
+      run_if_changed: "jenkins-slaves/.*"
+      skip_report: false
+      spec:
+        automountServiceAccountToken: true
+        containers:
+          - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+            command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+            args: ["mkdir -p $HOME/bin && curl -Lo $HOME/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x $HOME/bin/jq && export PATH=$PATH:$HOME/bin && oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/setup.sh applier cqci-${PROW_JOB_ID} $(echo ${JOB_SPEC}|jq -r '.refs.pulls[0].author')/${REPO_NAME} ${PULL_PULL_SHA} && _test/setup.sh test cqci-${PROW_JOB_ID} && oc delete project cqci-${PROW_JOB_ID}"]
+            env:
+              - name: GIT_COMMITTER_NAME
+                value: RedHat Containers CoP
+              - name: GIT_COMMITTER_EMAIL
+                value: redhat-cop@redhat.com
+    - name: cq-rabbitmq-pr-build
+      decorate: true
+      run_if_changed: "rabbitmq/.*"
+      skip_report: false
+      spec:
+        automountServiceAccountToken: true
+        containers:
+          - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+            command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+            args: ["mkdir -p $HOME/bin && curl -Lo $HOME/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x $HOME/bin/jq && export PATH=$PATH:$HOME/bin && oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/rabbitmq.sh applier cqci-${PROW_JOB_ID} $(echo ${JOB_SPEC}|jq -r '.refs.pulls[0].author')/${REPO_NAME} ${PULL_PULL_SHA} && _test/rabbitmq.sh test cqci-${PROW_JOB_ID} && oc delete project cqci-${PROW_JOB_ID}"]
+            env:
+              - name: GIT_COMMITTER_NAME
+                value: RedHat Containers CoP
+              - name: GIT_COMMITTER_EMAIL
+                value: redhat-cop@redhat.com
+  redhat-cop/pipeline-library:
+    - name: pipeline-library-pr-build
+      decorate: true
+      always_run: true
+      skip_report: false
+      spec:
+        automountServiceAccountToken: true
+        containers:
+          - image: quay.io/redhat-cop/openshift-applier:v2.1.1
+            command: ["/usr/local/bin/entrypoint", "/bin/bash", "-c"]
+            args: ["mkdir -p $HOME/bin && curl -Lo $HOME/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x $HOME/bin/jq && export PATH=$PATH:$HOME/bin && oc login --token $(cat /run/secrets/kubernetes.io/serviceaccount/token) --server https://kubernetes.default.svc --certificate-authority /run/secrets/kubernetes.io/serviceaccount/ca.crt && _test/setup.sh applier plci-${PROW_JOB_ID} $(echo ${JOB_SPEC}|jq -r '.refs.pulls[0].author')/${REPO_NAME} ${PULL_PULL_SHA} && _test/setup.sh test plci-${PROW_JOB_ID} && oc delete project plci-${PROW_JOB_ID}{,-promotion-testing,-build-s2i-executable,-sonarqube}"]
+            env:
+              - name: GIT_COMMITTER_NAME
+                value: RedHat Containers CoP
+              - name: GIT_COMMITTER_EMAIL
+                value: redhat-cop@redhat.com
+  redhat-cop/org:
+    - name: org-validate-configs
+      decorate: true
+      run_if_changed: config.yaml
+      spec:
+        containers:
+        - args:
+          - --config-path=./config.yaml
+          - --confirm=false
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy.default.svc	
+          - --github-endpoint=https://api.github.com	
+          - --github-graphql-endpoint=http://ghproxy.default.svc/graphql
+          - --fix-org
+          - --fix-org-members
+          - --fix-teams
+          - --fix-team-members
+          - --fix-team-repos
+          command:
+          - /app/prow/cmd/peribolos/app.binary
+          image: gcr.io/k8s-prow/peribolos:latest
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+          - mountPath: /etc/github
+            name: token
+            readOnly: true
+        volumes:
+        - name: token
+          secret:
+            secretName: github-oauth-token
+
+postsubmits:
+  redhat-cop/org:
+    - name: org-update-configs
+      decorate: true
+      run_if_changed: config.yaml
+      spec:
+        containers:
+        - args:
+          - --config-path=./config.yaml
+          - --confirm=true
+          - --github-token-path=/etc/github/oauth
+          - --github-endpoint=http://ghproxy.default.svc	
+          - --github-endpoint=https://api.github.com	
+          - --github-graphql-endpoint=http://ghproxy.default.svc/graphql
+          - --fix-org
+          - --fix-org-members
+          - --fix-teams
+          - --fix-team-members
+          - --fix-team-repos
+          command:
+          - /app/prow/cmd/peribolos/app.binary
+          image: gcr.io/k8s-prow/peribolos:latest
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+          - mountPath: /etc/github
+            name: token
+            readOnly: true
+        volumes:
+        - name: token
+          secret:
+            secretName: github-oauth-token
+
+tide:
+  merge_method:
+    redhat-cop/containers-quickstarts: squash
+    redhat-cop/pipeline-library: squash
+    redhat-cop/org: squash
+
+  target_url: https://prow-default.apps.ci-1.cop.rht-labs.com/tide
+
+  queries:
+  - repos:
+    - redhat-cop/containers-quickstarts
+    - redhat-cop/pipeline-library
+    - redhat-cop/org
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - do-not-merge
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - needs-ok-to-test
+    - needs-rebase
+
+  context_options:
+    # Use branch protection options to define required and optional contexts
+    from-branch-protection: true
+    # Treat unknown contexts as optional
+    skip-unknown-contexts: true
