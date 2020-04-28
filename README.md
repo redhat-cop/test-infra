@@ -6,4 +6,4 @@ This repo contains configurations for the Testing and CI Infastructure used by t
   * [config.yaml](config/prow/config.yaml) contains centralized configs for CI jobs
   * [plugins.yaml](config/prow/config.yaml) contains centralized plugin configs for repos
 
-These configs are self-updating, meaning that when changes are merged to this repo, Prow will automatically update itself using the [inrepoconfig](https://github.com/kubernetes/test-infra/blob/master/prow/inrepoconfig.md) feature.
+These configs are self-updating, meaning that when changes are merged to this repo, Prow will automatically update itself using the [updateconfig](https://github.com/kubernetes/test-infra/tree/master/prow/plugins/updateconfig) feature.
