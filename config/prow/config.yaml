@@ -19,7 +19,7 @@ deck:
 
 plank:
   allow_cancellation: true
-  job_url_prefix: 'https://prow-default.apps.ci-1.cop.rht-labs.com/view/gcs'
+  job_url_prefix: 'https://prow.cop.rht-labs.com/view/gcs'
   default_decoration_config:
     utility_images:
       clonerefs: gcr.io/k8s-prow/clonerefs:v20190823-9f991db2d
@@ -125,8 +125,8 @@ periodics:
         - --config-path=./config.yaml
         - --confirm=true
         - --github-token-path=/etc/github/oauth
-        - --github-endpoint=http://ghproxy.default.svc	
-        - --github-endpoint=https://api.github.com	
+        - --github-endpoint=http://ghproxy.default.svc
+        - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy.default.svc/graphql
         - --fix-org
         - --fix-org-members
@@ -229,8 +229,8 @@ presubmits:
           - --config-path=./config.yaml
           - --confirm=false
           - --github-token-path=/etc/github/oauth
-          - --github-endpoint=http://ghproxy.default.svc	
-          - --github-endpoint=https://api.github.com	
+          - --github-endpoint=http://ghproxy.default.svc
+          - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy.default.svc/graphql
           - --fix-org
           - --fix-org-members
@@ -265,8 +265,8 @@ postsubmits:
           - --config-path=./config.yaml
           - --confirm=true
           - --github-token-path=/etc/github/oauth
-          - --github-endpoint=http://ghproxy.default.svc	
-          - --github-endpoint=https://api.github.com	
+          - --github-endpoint=http://ghproxy.default.svc
+          - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy.default.svc/graphql
           - --fix-org
           - --fix-org-members
@@ -296,7 +296,7 @@ tide:
     redhat-cop/pipeline-library: squash
     redhat-cop/org: squash
 
-  target_url: https://prow-default.apps.ci-1.cop.rht-labs.com/tide
+  target_url: https://prow.cop.rht-labs.com/tide
 
   queries:
   - repos:
